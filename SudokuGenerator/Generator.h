@@ -12,11 +12,18 @@ class Generator
 {
 private:
     int board[9][9];
+
     
+
+    // Used for isValid.
     int primes[9] = {2,3,5,7,11,13,17,19,23};
     int set[9];
 
-    int c;
+    // Used to create the board.
+    int tryCounter;
+    // This will keep track of the frequency of each number. We want to prioritize numbers that there are less of.
+    int freq[9] = {0,0,0,0,0,0,0,0,0};
+    int numbers[9] = {1,2,3,4,5,6,7,8,9};
     
 public:
     
@@ -37,7 +44,7 @@ public:
 
     void generateBoard()
     {
-        c = 0;
+        tryCounter = 0;
         
         // Create a saved copy of the board
         int startingBoard[9][9];
@@ -47,6 +54,10 @@ public:
         outer_loop:
         // Reset the board
         copyBoard(board, startingBoard);
+        for (int i = 0; i < DIM; i++)
+        {
+            freq[i] = 0;
+        }
         
         // Fill the board with random values 1-9, if it cannot place a number, reset the board.
         for (int i = 0; i < DIM; i++)
@@ -54,28 +65,67 @@ public:
             for (int j = 0; j < DIM; j++)
             {
                 // Define an array of the numbers 1-9, then randomize it's order
-                int numbers[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+                int seed[9] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
                 std::mt19937 rng(std::random_device{}());
-                std::shuffle(numbers, numbers + 9, rng);
+                std::shuffle(seed, seed + 9, rng);
+
+                // Shuffle freq and numbers in the same way.
+                shuffleArray(freq, seed);
+                shuffleArray(numbers, seed);
+                
+                
+                int pickList[9];
+                int decoder[9];
+                int index = 0;
+                for (int r = 0; r < DIM; r++)
+                {
+                    for (int g = 0; g < DIM; g++)
+                    {
+                        if (freq[g] == r)
+                        {
+                            pickList[index] = numbers[g];
+                            decoder[index] = g;
+                            index++;
+                        }
+                    }
+                }
                 
                 for (int r = 0; r < DIM; r++)
                 {
-                    if (canPlace(i, j, numbers[r]))
+                    if (canPlace(i, j, pickList[r]))
                     {
-                        board[i][j] = numbers[r];
+                        board[i][j] = pickList[r];
+                        freq[decoder[r]] = freq[decoder[r]] + 1;
                         break;
                     }
                 }
 
                 if (board[i][j] == 0)
                 {
-                    c++;
+                    tryCounter++;
                     goto outer_loop; // Yes im using a goto fight me.
                 }
 
             }
         }
         
+    }
+
+    // Shuffles an array based on a seed
+    void shuffleArray(int arr[9], int seed[9])
+    {
+        // copy arr into a reference var
+        int reference[9];
+        for (int i = 0; i < 9; i++)
+        {
+            reference[i] = arr[i];
+        }
+        
+        // commence shuffling.
+        for (int i = 0; i < 9; i++)
+        {
+            arr[seed[i]] = reference[i];
+        }
     }
 
     // Try to place 1-9 in a random order on spot x, y. If fails, return false
@@ -90,16 +140,21 @@ public:
             }
         }
 
-        //Check col
-        for (int i = 0; i < DIM; i++)
+        // Only check col if we have enough values on the board to warrant it
+        if (board[0][1] != 0)
         {
-            if (board[x][i] == num)
+            // Check col
+            for (int i = 0; i < DIM; i++)
             {
-                return false;
+                if (board[x][i] == num)
+                {
+                    return false;
+                }
             }
         }
+        
 
-        //Check box
+        // Check box
         for (int i = 0; i < 3; i++)
         {
             for (int j = 0; j < 3; j++)
@@ -192,7 +247,7 @@ public:
 
     int getTries()
     {
-        return c;
+        return tryCounter;
     }
 };
 
