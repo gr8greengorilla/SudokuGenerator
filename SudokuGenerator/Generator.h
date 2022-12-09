@@ -20,6 +20,7 @@ private:
 
     // Used to create the board.
     int tryCounter;
+    int retryCount;
     // This will keep track of the frequency of each number. We want to prioritize numbers that there are less of.
     int freq[9] = {0,0,0,0,0,0,0,0,0};
     int numbers[9] = {1,2,3,4,5,6,7,8,9};
@@ -44,10 +45,10 @@ public:
 
     void generateBoard()
     {
-        tryCounter = 0;
-        int retryCount = RETRY_ROW_COUNT + 1;
-        int freqRetry[9];
-        int startingI = 0;
+        tryCounter = 0; // Used to track generation tries for the puzzle
+        retryCount = RETRY_ROW_COUNT + 1; // Used to count how many times the puzzle reverted back to an old row.
+        int freqRetry[9]; // Used store the freq numbers in order to revert back to.
+        int startingI = 0; // Used to store which row must be reverted back to.
 
         // Create saved copies of the board
         int startingBoards[2][9][9];
@@ -57,17 +58,17 @@ public:
     
         
         outer_loop:
+        // If the retry count has exceeded the max count, then reset everything.
         if (retryCount > RETRY_ROW_COUNT)
         {
             // Reset the board
             copyBoard(board, startingBoards[0]);
-            for (int i = 0; i < DIM; i++)
+            for (int& i : freq)
             {
-                freq[i] = 0;
+                i = 0;
             }
             retryCount = 0;
             startingI = 0;
-            
         } else
         {
             // Reset the board to current row
@@ -78,7 +79,7 @@ public:
         
         
         
-        // Fill the board with random values 1-9, if it cannot place a number, reset the board.
+        // Fill the board with random values 1-9, if it cannot place a number, revert or reset the board.
         for (int i = 0; i < DIM; i++)
         {
             if (i < startingI)
@@ -88,7 +89,7 @@ public:
             
             for (int j = 0; j < DIM; j++)
             {
-                // Define an array of the numbers 1-9, then randomize it's order
+                // Define an array of the numbers 0-8, then randomize it's order. This will be used for the seed of our randomization.
                 int seed[9] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
                 std::mt19937 rng(std::random_device{}());
                 std::shuffle(seed, seed + 9, rng);
@@ -97,7 +98,8 @@ public:
                 shuffleArray(freq, seed);
                 shuffleArray(numbers, seed);
                 
-                
+                // Create a pickList that goes in order from least frequent numbers to most, and randomizes the order of
+                // equally often numbers.
                 int pickList[9];
                 int decoder[9];
                 int index = 0;
@@ -114,6 +116,7 @@ public:
                     }
                 }
                 
+                // Try to place numbers in order from the pick list generated earlier
                 for (int r = 0; r < DIM; r++)
                 {
                     if (canPlace(i, j, pickList[r]))
@@ -124,15 +127,19 @@ public:
                     }
                 }
 
+                // If a number failed to place
                 if (board[i][j] == 0)
                 {
+                    // Inc the try counter and skip to the outer loop.
                     tryCounter++;
                     goto outer_loop; // Yes im using a goto fight me.
                 }
             }
+
+            // After every row, save the current board and the freq count so it can be reverted back to later.
             copyBoard(startingBoards[1], board);
             copyArray(freqRetry, freq);
-            startingI = i;
+            startingI = i; // We must know which row to revert back to.
         }
         
     }
@@ -143,6 +150,19 @@ public:
         for (int i = 0; i < DIM; i++)
         {
             dest[i] = reference[i];
+        }
+    }
+
+    // Fill board with 0s.
+    void clearBoard()
+    {
+        // Init board to be a 9x9 grid of 0s
+        for (int i = 0; i < DIM; i++)
+        {
+            for (int j = 0; j < DIM; j++)
+            {
+                board[i][j] = 0;
+            }
         }
     }
 
@@ -166,10 +186,20 @@ public:
     // Try to place 1-9 in a random order on spot x, y. If fails, return false
     bool canPlace(int x, int y, int num)
     {
+        int numAt = 0;
+        
         // Check row
         for (int i = 0; i < DIM; i++)
         {
-            if (board[i][y] == num)
+            numAt = board[i][y];
+            // If we run into a 0, then the rest of the row must be empty.
+            if (numAt == 0)
+            {
+                break;
+            }
+
+            // If a dupe is found, return false.
+            if (numAt == num)
             {
                 return false;
             }
@@ -181,7 +211,16 @@ public:
             // Check col
             for (int i = 0; i < DIM; i++)
             {
-                if (board[x][i] == num)
+                numAt = board[x][i];
+                
+                // If we run into a 0, then the rest of the col must be empty.
+                if (numAt == 0)
+                {
+                    break;
+                }
+                
+                // If a dupe is found, return false.
+                if (numAt == num)
                 {
                     return false;
                 }
@@ -194,7 +233,16 @@ public:
         {
             for (int j = 0; j < 3; j++)
             {
-                if (board[(x / 3) * 3 + i][(y / 3) * 3 + j] == num)
+                numAt = board[(x / 3) * 3 + i][(y / 3) * 3 + j];
+                
+                // If we run into a 0, then the rest of the box must be empty.
+                if (numAt == 0)
+                {
+                    break;
+                }
+                
+                // If a dupe is found, return false.
+                if (numAt == num)
                 {
                     return false;
                 }
@@ -224,6 +272,7 @@ public:
         {
             if (!hasAllNums(i)) {return false;}
         }
+
         
         // Check columns
         for (int i = 0; i < DIM; i++)
@@ -236,10 +285,11 @@ public:
             if (!hasAllNums(set)) {return false;}
         }
 
+        
         // Check each 3x3 box
         for (int a = 0; a < 3; a++)
         {
-            for (int b = 0; b < 3; a++)
+            for (int b = 0; b < 3; b++)
             {
                 for (int i = 0; i < 3; i++)
                 {
@@ -262,8 +312,9 @@ public:
         int product = 1;
         for (int i = 0; i < 9; i++)
         {
-            product *= primes[nums[i]];
+            product *= primes[nums[i] - 1];
         }
+        
         return product == 223092870; // product == product of the first 9 primes.
     }
 
@@ -283,6 +334,23 @@ public:
     int getTries()
     {
         return tryCounter;
+    }
+
+    int getRetries()
+    {
+        return retryCount;
+    }
+
+    // Remove x% of the numbers from the board.
+    void removePercent(float x)
+    {
+        for (int i = 0; i < DIM; i++)
+        {
+            for (int j = 0; j < DIM; j++)
+            {
+                board[i][j] = (rand() % 100 <= x * 100) ? 0 : board[i][j];
+            }
+        }
     }
 };
 
