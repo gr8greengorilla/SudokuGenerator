@@ -7,13 +7,12 @@
 #include <random>
 
 #define DIM 9
+#define RETRY_ROW_COUNT 25
 
 class Generator
 {
 private:
     int board[9][9];
-
-    
 
     // Used for isValid.
     int primes[9] = {2,3,5,7,11,13,17,19,23};
@@ -29,6 +28,7 @@ public:
     
     Generator()
     {
+        
         // Init board to be a 9x9 grid of 0s
         for (int i = 0; i < DIM; i++)
         {
@@ -45,23 +45,47 @@ public:
     void generateBoard()
     {
         tryCounter = 0;
-        
-        // Create a saved copy of the board
-        int startingBoard[9][9];
-        copyBoard(startingBoard, board);
+        int retryCount = RETRY_ROW_COUNT + 1;
+        int freqRetry[9];
+        int startingI = 0;
 
+        // Create saved copies of the board
+        int startingBoards[2][9][9];
+        
+        // Create a saved copy of the blank board
+        copyBoard(startingBoards[0], board);
+    
         
         outer_loop:
-        // Reset the board
-        copyBoard(board, startingBoard);
-        for (int i = 0; i < DIM; i++)
+        if (retryCount > RETRY_ROW_COUNT)
         {
-            freq[i] = 0;
+            // Reset the board
+            copyBoard(board, startingBoards[0]);
+            for (int i = 0; i < DIM; i++)
+            {
+                freq[i] = 0;
+            }
+            retryCount = 0;
+            startingI = 0;
+            
+        } else
+        {
+            // Reset the board to current row
+            copyBoard(board, startingBoards[1]);
+            copyArray(freq, freqRetry);
+            retryCount++;
         }
+        
+        
         
         // Fill the board with random values 1-9, if it cannot place a number, reset the board.
         for (int i = 0; i < DIM; i++)
         {
+            if (i < startingI)
+            {
+                i = startingI;
+            }
+            
             for (int j = 0; j < DIM; j++)
             {
                 // Define an array of the numbers 1-9, then randomize it's order
@@ -105,10 +129,21 @@ public:
                     tryCounter++;
                     goto outer_loop; // Yes im using a goto fight me.
                 }
-
             }
+            copyBoard(startingBoards[1], board);
+            copyArray(freqRetry, freq);
+            startingI = i;
         }
         
+    }
+    
+    // Copy reference array in to dest array.
+    void copyArray(int dest[DIM], int reference[DIM])
+    {
+        for (int i = 0; i < DIM; i++)
+        {
+            dest[i] = reference[i];
+        }
     }
 
     // Shuffles an array based on a seed
